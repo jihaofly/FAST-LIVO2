@@ -1,0 +1,30 @@
+<launch>
+<!-- Launch file for Livox AVIA LiDAR -->
+
+	<arg name="rviz" default="false" />
+	<!-- MindCloud 开关：true=录制数据输出 pcd；false=仅建图不录制（默认）。
+	     由 start_fastlivo2.sh 传入的 true/false 参数控制 -->
+	<arg name="pcd_save" default="false" />
+
+	<!-- <rosparam command="load" file="$(find fast_livo)/config/MID360.yaml" /> -->
+	<rosparam command="load" file="$(find fast_livo)/config/MID360_Fly_Lidar.yaml" />
+	<!-- 依据 pcd_save 参数覆盖 pcd_save/pcd_save_en -->
+	<group if="$(arg pcd_save)">
+		<rosparam param="pcd_save/pcd_save_en">true</rosparam>
+	</group>
+	<group unless="$(arg pcd_save)">
+		<rosparam param="pcd_save/pcd_save_en">false</rosparam>
+	</group>
+	<node pkg="fast_livo" type="fastlivo_mapping" name="laserMapping" output="screen">
+		<rosparam file="$(find fast_livo)/config/camera_self.yaml" />
+	</node>
+	
+	<group if="$(arg rviz)">
+		<node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find fast_livo)/rviz_cfg/fast_livo2.rviz" />
+	</group>
+	
+	<node pkg="image_transport" type="republish" name="republish" args="compressed in:=/usb_cam/image_raw raw out:=/usb_cam/image_raw" output="screen" respawn="true"/>
+
+launch-prefix="gdb -ex run --args"
+launch-prefix="valgrind --leak-check=full"
+</launch> 	
