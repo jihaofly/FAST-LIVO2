@@ -14,6 +14,7 @@ which is included as part of this source code package.
 #define LIV_MAPPER_H
 
 #include "IMU_Processing.h"
+#include <ctime>
 #include "vio.h"
 #include "preprocess.h"
 #include <cv_bridge/cv_bridge.h>
@@ -106,6 +107,7 @@ public:
   bool lidar_pushed = false, imu_en, gravity_est_en, flg_reset = false, ba_bg_est_en = true;
   bool dense_map_en = false;
   int img_en = 1, imu_int_frame = 3;
+  std::string save_session_id_;  // 本轮建图会话ID（时间戳），用于 PCD 文件名
   bool normal_en = true;
   bool exposure_estimate_en = false;
   double exposure_time_init = 0.0;

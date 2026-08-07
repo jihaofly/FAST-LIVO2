@@ -52,6 +52,13 @@ void LIVMapper::readParameters(ros::NodeHandle &nh)
   nh.param<string>("common/lid_topic", lid_topic, "/livox/lidar");
   nh.param<string>("common/imu_topic", imu_topic, "/livox/imu");
   nh.param<bool>("common/ros_driver_bug_fix", ros_driver_fix_en, false);
+  { // 生成本轮会话ID（时间戳），用作 PCD 文件名
+    char buf[32];
+    time_t t = time(nullptr);
+    struct tm *tm_ = localtime(&t);
+    strftime(buf, sizeof(buf), "%Y%m%d_%H%M%S", tm_);
+    save_session_id_ = std::string(buf);
+  }
   nh.param<int>("common/img_en", img_en, 1);
   nh.param<int>("common/lidar_en", lidar_en, 1);
   nh.param<string>("common/img_topic", img_topic, "/left_camera/image");
@@ -485,8 +492,8 @@ void LIVMapper::savePCD()
 {
   if (pcd_save_en && (pcl_wait_save->points.size() > 0 || pcl_wait_save_intensity->points.size() > 0) && pcd_save_interval < 0) 
   {
-    std::string raw_points_dir = std::string(ROOT_DIR) + "Log/pcd/all_raw_points.pcd";
-    std::string downsampled_points_dir = std::string(ROOT_DIR) + "Log/pcd/all_downsampled_points.pcd";
+    std::string raw_points_dir = std::string(ROOT_DIR) + "Log/pcd/" + save_session_id_ + ".pcd";
+    std::string downsampled_points_dir = std::string(ROOT_DIR) + "Log/pcd/" + save_session_id_ + "_downsampled.pcd";
     pcl::PCDWriter pcd_writer;
 
     if (img_en)
