@@ -11,6 +11,10 @@ which is included as part of this source code package.
 */
 
 #include "LIVMapper.h"
+#include <unistd.h>      // fork / setsid / _exit
+#include <sys/prctl.h>   // prctl(PR_SET_NAME) 子进程改名
+#include <cstring>       // strerror
+#include <cerrno>        // errno
 
 LIVMapper::LIVMapper(ros::NodeHandle &nh)
     : extT(0, 0, 0),
@@ -488,8 +492,9 @@ void LIVMapper::handleLIO()
             << _state.bias_a.transpose() << " " << V3D(_state.inv_expo_time, 0, 0).transpose() << " " << feats_undistort->points.size() << std::endl;
 }
 
-void LIVMapper::savePCD() 
+void LIVMapper::writePCDFiles() 
 {
+  // 实际的 PCD 写盘逻辑：在 fork 出的子进程（或 fork 失败时的主进程）中执行
   if (pcd_save_en && (pcl_wait_save->points.size() > 0 || pcl_wait_save_intensity->points.size() > 0) && pcd_save_interval < 0) 
   {
     std::string raw_points_dir = std::string(ROOT_DIR) + "Log/pcd/" + save_session_id_ + ".pcd";
@@ -536,6 +541,37 @@ void LIVMapper::savePCD()
                 << " with point count: " << pcl_wait_save_intensity->points.size() << RESET << std::endl;
     }
   }
+}
+
+void LIVMapper::savePCD() 
+{
+  // X2 方案：PCD 写盘 fork 出独立子进程后台执行。
+  //  - 父进程（fastlivo_mapping 主进程）收到 SIGINT 后快速退出，
+  //    外部关闭/启动流程不再被大点云写盘阻塞（写盘不占用雷达/串口/端口）。
+  //  - 子进程脱离原进程组并改名 pcd_saver，后台把内存点云写成 PCD
+  //    （fork COW 继承数据，无需搬运；外部用进程名匹配不会误伤它）。
+  if (!(pcd_save_en && (pcl_wait_save->points.size() > 0 || pcl_wait_save_intensity->points.size() > 0) && pcd_save_interval < 0)) 
+  {
+    return;
+  }
+
+  pid_t pid = fork();
+  if (pid < 0) {
+    std::cerr << "\033[1;31m[Fast-LIVO2] savePCD fork 失败，退化为同步写盘: "
+              << strerror(errno) << "\033[0m" << std::endl;
+    writePCDFiles();
+    return;
+  }
+  if (pid == 0) {
+    // 子进程：独立会话/进程组 + 改名，避免被外部 killpg/pkill 误杀
+    setsid();
+    prctl(PR_SET_NAME, "pcd_saver", 0, 0, 0);
+    writePCDFiles();
+    _exit(0);
+  }
+  // 父进程立即返回 → run() 结束 → 主进程秒退；PCD 由孤儿子进程 pcd_saver 后台完成
+  std::cout << "\033[1;33m[Fast-LIVO2] savePCD 已移交子进程(pid=" << pid
+            << ")后台写盘，主进程快速退出\033[0m" << std::endl;
 }
 
 void LIVMapper::run() 

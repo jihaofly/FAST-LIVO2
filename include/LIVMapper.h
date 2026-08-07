@@ -37,6 +37,7 @@ public:
   void handleVIO();
   void handleLIO();
   void savePCD();
+  void writePCDFiles();  // X2: 实际的 PCD 写盘逻辑（可在 fork 出的子进程中执行）
   void processImu();
   
   bool sync_packages(LidarMeasureGroup &meas);
