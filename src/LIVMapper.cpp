@@ -1243,7 +1243,15 @@ void LIVMapper::publish_frame_world(const ros::Publisher &pubLaserCloudFullRes, 
   std::stringstream ss_time;
   ss_time << std::fixed << std::setprecision(6) << update_time;
 
-  if (pcd_save_en)
+  // [PATCH-pcdtoggle] 运行时开关：rosparam /fast_livo/pcd_save_runtime（默认 true）
+  // 探索脚本运行期间设 false：不再往内存大点云里追加（该累积会拖慢每帧处理，见 2026-10-11 18:45 事故分析）
+  static bool pcd_rt = true;
+  {
+    bool v = true;
+    if (!ros::param::getCached("/fast_livo/pcd_save_runtime", v)) v = true;
+    if (v != pcd_rt) { ROS_WARN("[PATCH-pcdtoggle] 点云累积保存 %s", v ? "恢复" : "暂停（探索中）"); pcd_rt = v; }
+  }
+  if (pcd_save_en && pcd_rt)
   {
     static int scan_wait_num = 0;
 
